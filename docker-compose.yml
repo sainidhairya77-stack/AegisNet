@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aegisnet-postgres
+    environment:
+      POSTGRES_USER: aegisnet
+      POSTGRES_PASSWORD: aegisnet_password
+      POSTGRES_DB: aegisnet
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegisnet -d aegisnet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aegisnet-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aegisnet-backend
+    environment:
+      DATABASE_URL: postgresql://aegisnet:aegisnet_password@postgres:5432/aegisnet
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    networks:
+      - aegisnet-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aegisnet-frontend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+    networks:
+      - aegisnet-network
+
+volumes:
+  postgres_data:
+
+networks:
+  aegisnet-network:
+    driver: bridge
