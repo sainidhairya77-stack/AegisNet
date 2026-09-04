@@ -18,15 +18,30 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
-# Password hashing
+
+# ============================================================
+# Password Hashing
+# ============================================================
+
 pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto"
 )
 
-# Swagger / Bearer authentication
-bearer_scheme = HTTPBearer(auto_error=False)
 
+# ============================================================
+# Swagger / Bearer Authentication
+# ============================================================
+
+bearer_scheme = HTTPBearer(
+    scheme_name="BearerAuth",
+    auto_error=False
+)
+
+
+# ============================================================
+# Password Hasher
+# ============================================================
 
 class PasswordHasher:
     """Password hashing utilities"""
@@ -36,9 +51,19 @@ class PasswordHasher:
         return pwd_context.hash(password)
 
     @staticmethod
-    def verify(plain_password: str, hashed_password: str) -> bool:
-        return pwd_context.verify(plain_password, hashed_password)
+    def verify(
+        plain_password: str,
+        hashed_password: str
+    ) -> bool:
+        return pwd_context.verify(
+            plain_password,
+            hashed_password
+        )
 
+
+# ============================================================
+# JWT Handler
+# ============================================================
 
 class JWTHandler:
     """JWT token creation and validation"""
@@ -73,6 +98,7 @@ class JWTHandler:
     @staticmethod
     def verify_token(token: str) -> dict:
         try:
+
             payload = jwt.decode(
                 token,
                 settings.jwt_secret,
@@ -96,14 +122,19 @@ class JWTHandler:
             )
 
 
+# ============================================================
+# Current User Authentication
+# ============================================================
+
 async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
-        bearer_scheme
-    )
+    credentials: Optional[
+        HTTPAuthorizationCredentials
+    ] = Depends(bearer_scheme)
 ) -> str:
 
     # No token
     if credentials is None:
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing authentication token",
@@ -122,6 +153,7 @@ async def get_current_user(
     user_id = payload.get("sub")
 
     if not user_id:
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload",
@@ -133,13 +165,18 @@ async def get_current_user(
     return user_id
 
 
+# ============================================================
+# Admin Authentication
+# ============================================================
+
 async def get_current_admin(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
-        bearer_scheme
-    )
+    credentials: Optional[
+        HTTPAuthorizationCredentials
+    ] = Depends(bearer_scheme)
 ) -> str:
 
     if credentials is None:
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing authentication token",
@@ -153,6 +190,7 @@ async def get_current_admin(
     payload = JWTHandler.verify_token(token)
 
     if payload.get("role") != "ADMIN":
+
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
@@ -161,13 +199,18 @@ async def get_current_admin(
     return payload.get("sub")
 
 
+# ============================================================
+# Analyst Authentication
+# ============================================================
+
 async def get_current_analyst(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
-        bearer_scheme
-    )
+    credentials: Optional[
+        HTTPAuthorizationCredentials
+    ] = Depends(bearer_scheme)
 ) -> str:
 
     if credentials is None:
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing authentication token",
@@ -180,7 +223,11 @@ async def get_current_analyst(
 
     payload = JWTHandler.verify_token(token)
 
-    if payload.get("role") not in ("ADMIN", "ANALYST"):
+    if payload.get("role") not in (
+        "ADMIN",
+        "ANALYST"
+    ):
+
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Analyst or admin access required"
@@ -189,6 +236,10 @@ async def get_current_analyst(
     return payload.get("sub")
 
 
+# ============================================================
+# Authorization Error
+# ============================================================
+
 class AuthorizationError(HTTPException):
     """Custom authorization error"""
 
@@ -196,6 +247,7 @@ class AuthorizationError(HTTPException):
         self,
         detail: str = "Not authorized"
     ):
+
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=detail
