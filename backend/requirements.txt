@@ -63,3 +63,4 @@ mypy==1.14.1
 
 # Utilities
 python-ulid==4.0.1
+python-jose[cryptography]
