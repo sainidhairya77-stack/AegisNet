@@ -14,6 +14,7 @@ from app.config import get_settings
 
 import logging
 
+
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
@@ -55,6 +56,7 @@ class PasswordHasher:
         plain_password: str,
         hashed_password: str
     ) -> bool:
+
         return pwd_context.verify(
             plain_password,
             hashed_password
@@ -96,13 +98,18 @@ class JWTHandler:
         return token, expires
 
     @staticmethod
-    def verify_token(token: str) -> dict:
+    def verify_token(
+        token: str
+    ) -> dict:
+
         try:
 
             payload = jwt.decode(
                 token,
                 settings.jwt_secret,
-                algorithms=[settings.jwt_algorithm]
+                algorithms=[
+                    settings.jwt_algorithm
+                ]
             )
 
             return payload
@@ -123,7 +130,7 @@ class JWTHandler:
 
 
 # ============================================================
-# Current User Authentication
+# Current User
 # ============================================================
 
 async def get_current_user(
@@ -166,7 +173,7 @@ async def get_current_user(
 
 
 # ============================================================
-# Admin Authentication
+# Current Admin
 # ============================================================
 
 async def get_current_admin(
@@ -200,7 +207,7 @@ async def get_current_admin(
 
 
 # ============================================================
-# Analyst Authentication
+# Current Analyst
 # ============================================================
 
 async def get_current_analyst(
@@ -252,3 +259,4 @@ class AuthorizationError(HTTPException):
             status_code=status.HTTP_403_FORBIDDEN,
             detail=detail
         )
+        
