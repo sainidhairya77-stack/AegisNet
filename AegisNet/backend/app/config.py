@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
     # Database
-    database_url: str = "postgresql://aegisnet_user:aegisnet_password@localhost:5432/aegisnet"
+    database_url: str = "postgresql://aegisnet:aegisnet_password@localhost:5432/aegisnet"
 
     # API
     api_host: str = "0.0.0.0"
