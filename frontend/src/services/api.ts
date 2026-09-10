@@ -298,8 +298,11 @@ export const api = {
   // PCAPs
   async listPcaps(): Promise<{ pcaps: PcapFile[]; total: number }> {
     try {
-      const res = await apiClient.get('/pcaps');
-      return { pcaps: res.data, total: res.data.length };
+      const res = await apiClient.get('/pcaps/');
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        return { pcaps: res.data, total: res.data.length };
+      }
+      return { pcaps: DEMO_PCAPS, total: DEMO_PCAPS.length };
     } catch {
       return { pcaps: DEMO_PCAPS, total: DEMO_PCAPS.length };
     }
@@ -372,7 +375,10 @@ export const api = {
   async getFlows(pcapId: string): Promise<{ total_flows: number; flows: NetworkFlow[] }> {
     try {
       const res = await apiClient.get(`/pcaps/${pcapId}/flows`);
-      return res.data;
+      if (res.data && Array.isArray(res.data.flows) && res.data.flows.length > 0) {
+        return res.data;
+      }
+      return { total_flows: DEMO_FLOWS.length, flows: DEMO_FLOWS };
     } catch {
       return { total_flows: DEMO_FLOWS.length, flows: DEMO_FLOWS };
     }
@@ -382,7 +388,10 @@ export const api = {
     try {
       const url = pcapId ? `/pcaps/${pcapId}/alerts` : '/pcaps/alerts';
       const res = await apiClient.get(url);
-      return res.data;
+      if (res.data && Array.isArray(res.data.alerts) && res.data.alerts.length > 0) {
+        return res.data;
+      }
+      return { total_alerts: DEMO_ALERTS.length, alerts: DEMO_ALERTS };
     } catch {
       return { total_alerts: DEMO_ALERTS.length, alerts: DEMO_ALERTS };
     }
@@ -392,11 +401,15 @@ export const api = {
     try {
       const url = pcapId ? `/pcaps/${pcapId}/incidents` : '/pcaps/incidents';
       const res = await apiClient.get(url);
-      return res.data;
+      if (res.data && Array.isArray(res.data.incidents) && res.data.incidents.length > 0) {
+        return res.data;
+      }
+      return { total_incidents: DEMO_INCIDENTS.length, incidents: DEMO_INCIDENTS };
     } catch {
       return { total_incidents: DEMO_INCIDENTS.length, incidents: DEMO_INCIDENTS };
     }
   },
+
 
   async getGraph(pcapId: string): Promise<NetworkGraph> {
     try {

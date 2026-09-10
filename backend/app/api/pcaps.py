@@ -306,6 +306,70 @@ async def get_pcap_flows(
     }
 
 
+@router.get("/alerts")
+async def get_all_alerts(
+    db: Session = Depends(get_db),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+):
+    """Get all alerts across all PCAPs"""
+    from app.models import Alert
+    query = db.query(Alert)
+    total = query.count()
+    alerts = query.order_by(Alert.triggered_at.desc()).offset(offset).limit(limit).all()
+    return {
+        "total_alerts": total,
+        "alerts": [
+            {
+                "id": a.id,
+                "rule_id": a.rule_id,
+                "rule_name": a.rule_name,
+                "description": a.description,
+                "severity": a.severity.value if a.severity else "UNKNOWN",
+                "confidence": a.confidence or 0.85,
+                "source_ip": a.source_ip,
+                "destination_ip": a.destination_ip,
+                "alert_type": a.alert_type or "Threat",
+                "triggered_at": a.triggered_at.isoformat() if a.triggered_at else None,
+                "evidence": a.evidence_data or {}
+            }
+            for a in alerts
+        ]
+    }
+
+
+@router.get("/incidents")
+async def get_all_incidents(
+    db: Session = Depends(get_db),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0)
+):
+    """Get all incidents across all PCAPs"""
+    from app.models import Incident
+    query = db.query(Incident)
+    total = query.count()
+    incidents = query.order_by(Incident.detected_at.desc()).offset(offset).limit(limit).all()
+    return {
+        "total_incidents": total,
+        "incidents": [
+            {
+                "id": i.id,
+                "title": i.title,
+                "description": i.description,
+                "severity": i.severity.value if i.severity else "UNKNOWN",
+                "risk_score": i.risk_score or 0.0,
+                "status": i.status.value if i.status else "OPEN",
+                "alert_count": len(i.alerts) if hasattr(i, 'alerts') and i.alerts else 0,
+                "source_ips": i.source_ips or [],
+                "destination_ips": i.destination_ips or [],
+                "detected_at": i.detected_at.isoformat() if i.detected_at else (i.created_at.isoformat() if i.created_at else None),
+                "created_at": i.created_at.isoformat() if i.created_at else None,
+            }
+            for i in incidents
+        ]
+    }
+
+
 @router.get("/{pcap_id}/alerts")
 async def get_pcap_alerts(
     pcap_id: str,

@@ -7,7 +7,8 @@ import {
   Network, 
   ShieldAlert,
   Terminal,
-  Activity
+  Activity,
+  Lock
 } from 'lucide-react';
 
 const navItems = [
@@ -16,6 +17,7 @@ const navItems = [
   { path: '/incidents', label: 'Incidents & Alerts', icon: AlertTriangle },
   { path: '/topology', label: 'Network Attack Graph', icon: Network },
   { path: '/simulation', label: 'Defense Simulation', icon: ShieldAlert },
+  { path: '/login', label: 'Auth & Login Portal', icon: Lock },
 ];
 
 export const Sidebar: React.FC = () => {

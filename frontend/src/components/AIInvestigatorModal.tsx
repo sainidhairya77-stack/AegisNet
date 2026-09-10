@@ -33,7 +33,7 @@ export const AIInvestigatorModal: React.FC<AIInvestigatorModalProps> = ({
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: `Hello Analyst. I have processed the forensic telemetry for **"${incident.title}"** (Risk Index: **${incident.risk_score.toFixed(1)}/100**).\n\nI can analyze attack vectors, reconstruct timelines, identify lateral movement, and generate containment firewall rules. What would you like to investigate?`,
+      content: `Hello Analyst. I have processed the forensic telemetry for **"${incident.title}"** (Risk Index: **${(incident.risk_score ?? 0).toFixed(1)}/100**).\n\nI can analyze attack vectors, reconstruct timelines, identify lateral movement, and generate containment firewall rules. What would you like to investigate?`,
       recommendations: [
         'Analyze full attack chain & MITRE mapping',
         'Verify if database data was exfiltrated',

@@ -9,13 +9,14 @@ import {
   Clock, 
   CheckCircle,
   FileSearch,
-  Shield
+  Shield,
+  Bot,
+  Sparkles
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { Incident, Alert, AlertSeverity } from '../types';
 import { AIInvestigatorModal } from '../components/AIInvestigatorModal';
-import { Bot, Sparkles } from 'lucide-react';
 
 export const Incidents: React.FC = () => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -112,9 +113,9 @@ export const Incidents: React.FC = () => {
                     <div className="font-mono" style={{ 
                       fontSize: '1.5rem', 
                       fontWeight: 700, 
-                      color: incident.risk_score >= 80 ? 'var(--danger)' : 'var(--warning)' 
+                      color: (incident.risk_score ?? 0) >= 80 ? 'var(--danger)' : 'var(--warning)' 
                     }}>
-                      {incident.risk_score.toFixed(1)}
+                      {(incident.risk_score ?? 0).toFixed(1)}
                     </div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>RISK INDEX</div>
                   </div>

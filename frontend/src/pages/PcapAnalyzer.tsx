@@ -10,7 +10,8 @@ import {
   Activity,
   Layers,
   Flame,
-  AlertTriangle
+  AlertTriangle,
+  Zap
 } from 'lucide-react';
 import { api } from '../services/api';
 import { PcapFile, NetworkFlow, AnalysisResult } from '../types';

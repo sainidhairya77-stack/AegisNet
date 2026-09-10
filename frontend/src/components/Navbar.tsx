@@ -139,18 +139,29 @@ export const Navbar: React.FC = () => {
               </button>
 
               <button
-                onClick={logout}
+                onClick={() => {
+                  logout();
+                  window.location.href = '/login';
+                }}
                 className="btn btn-secondary btn-sm"
-                title="Sign Out"
+                title="Sign Out to Login Portal"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               >
                 <LogOut size={14} />
+                <span>Logout</span>
               </button>
             </>
           ) : (
-            <button onClick={() => loginDemo('ANALYST')} className="btn btn-primary btn-sm">
-              <UserCheck size={14} />
-              Quick Demo Login
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <a 
+                href="/login" 
+                className="btn btn-primary btn-sm"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}
+              >
+                <UserCheck size={14} />
+                <span>Login Portal</span>
+              </a>
+            </div>
           )}
         </div>
       </header>
