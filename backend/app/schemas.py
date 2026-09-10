@@ -23,6 +23,7 @@ class UserRegister(BaseModel):
     email: str = Field(..., min_length=5, max_length=255)
     password: str = Field(..., min_length=8, max_length=255)
     full_name: Optional[str] = None
+    role: Optional[UserRole] = UserRole.ANALYST
 
     @field_validator("username")
     @classmethod

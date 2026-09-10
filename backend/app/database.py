@@ -13,12 +13,20 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
-# Create engine with connection pooling
+# Create engine with appropriate parameters for PostgreSQL or SQLite
+is_sqlite = settings.database_url.startswith("sqlite")
+engine_kwargs = {
+    "echo": False,
+    "pool_pre_ping": not is_sqlite,
+}
+if is_sqlite:
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+elif settings.is_development:
+    engine_kwargs["poolclass"] = NullPool
+
 engine = create_engine(
     settings.database_url,
-    echo=False,
-    pool_pre_ping=True,  # Test connections before using
-    poolclass=NullPool if settings.is_development else None
+    **engine_kwargs
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

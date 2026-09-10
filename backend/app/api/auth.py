@@ -85,7 +85,7 @@ async def register(
         email=user_data.email,
         full_name=user_data.full_name,
         hashed_password=hashed_password,
-        role="VIEWER",
+        role=user_data.role.value if getattr(user_data, "role", None) else "ANALYST",
         is_active=True,
         created_at=datetime.utcnow()
     )

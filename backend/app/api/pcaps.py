@@ -4,24 +4,35 @@ PCAP upload and analysis API routes
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+import os
+import hashlib
+from uuid import uuid4
+from datetime import datetime
+import logging
 
 from app.database import get_db
-from app.models import PcapFile
-from app.schemas import AttackPathResponse, NetworkGraph, PcapUploadResponse, PcapDetail
+from app.models import PcapFile, Incident, BlocklistEntry, ResponseRequest, User
+from app.schemas import (
+    AttackPathResponse, NetworkGraph, PcapUploadResponse, PcapDetail,
+    AIInvestigationRequest, AIInvestigationResponse, SimulationCreate, SimulationResponse,
+    ResponseActionCreate, ResponseActionResponse, BlocklistEntryResponse
+)
 from app.services.pcap_service import PcapFileService
 from app.services.packet_parser import PacketParser, FlowAggregator, PcapParseError
 from app.services.rule_engine import RuleEngine
 from app.services.ml_engine import MLDetectionEngine
 from app.services.correlation_engine import IncidentCorrelator
 from app.services.graph_engine import AttackPathAnalyzer, NetworkTopologyBuilder
-from app.security import get_current_user, get_current_analyst
-import logging
+from app.services.ai_investigator import AIInvestigator
+from app.services.simulation_engine import DigitalTwinSimulator
+from app.services.response_engine import ResponseEngine
+from app.services.sample_traffic import generate_apt29_scenario_pcap
+from app.security import get_current_user, get_current_analyst, get_current_admin
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/pcaps", tags=["PCAP Analysis"])
-
 
 @router.post("/upload", response_model=PcapUploadResponse)
 async def upload_pcap(
@@ -443,3 +454,211 @@ async def get_incident_attack_paths(
         raise HTTPException(status_code=404, detail="Incident not found")
 
     return AttackPathAnalyzer.list_for_incident(db, incident_id)
+
+
+# ============================================================
+# Realistic Scenario / Attack Sample Generator
+# ============================================================
+
+@router.post("/sample-attack", response_model=PcapUploadResponse)
+async def generate_sample_attack(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_analyst)
+):
+    """
+    Generate and register a realistic multi-stage APT attack scenario PCAP.
+    Includes port scan, SSH brute force, web exploitation, lateral movement, and data exfiltration.
+    """
+    target_dir = "./data/samples"
+    os.makedirs(target_dir, exist_ok=True)
+    filename = f"apt29_scenario_{int(datetime.utcnow().timestamp())}.pcap"
+    file_path = os.path.join(target_dir, filename)
+
+    # Generate Scapy packets
+    generate_apt29_scenario_pcap(file_path)
+
+    # Compute hash and size
+    file_size = os.path.getsize(file_path)
+    with open(file_path, "rb") as f:
+        sha256_hash = hashlib.sha256(f.read()).hexdigest()
+
+    pcap = PcapFileService.create_pcap_record(
+        db=db,
+        original_filename="apt29_campaign_investigation.pcap",
+        internal_filename=filename,
+        file_path=file_path,
+        sha256_hash=sha256_hash,
+        file_size=file_size,
+        uploader_id=user_id
+    )
+
+    logger.info(f"Sample attack PCAP created for user {user_id}: {pcap.id}")
+    return pcap
+
+
+# ============================================================
+# AI Incident Investigation
+# ============================================================
+
+@router.post("/{pcap_id}/incidents/{incident_id}/investigate", response_model=AIInvestigationResponse)
+async def investigate_incident(
+    pcap_id: str,
+    incident_id: str,
+    request: AIInvestigationRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Run AI Incident Investigation using OpenAI GPT-4o (or intelligent local cyber copilot fallback).
+    """
+    incident = (
+        db.query(Incident)
+        .filter(Incident.id == incident_id, Incident.pcap_file_id == pcap_id)
+        .first()
+    )
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    try:
+        investigation = AIInvestigator.investigate(
+            db=db,
+            incident=incident,
+            message=request.message,
+            user_id=user_id
+        )
+        return AIInvestigationResponse(
+            id=investigation.id,
+            response=investigation.summary or "",
+            findings=investigation.findings,
+            recommendations=investigation.recommendations or []
+        )
+    except Exception as e:
+        logger.error(f"AI investigation error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"AI Investigation failed: {str(e)}")
+
+
+@router.get("/{pcap_id}/incidents/{incident_id}/investigations")
+async def list_incident_investigations(
+    pcap_id: str,
+    incident_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    """List historical AI investigations for an incident."""
+    return AIInvestigator.list_for_incident(db, incident_id)
+
+
+# ============================================================
+# Digital Twin Defense Simulation
+# ============================================================
+
+@router.post("/{pcap_id}/incidents/{incident_id}/simulate", response_model=SimulationResponse)
+async def simulate_defense_action(
+    pcap_id: str,
+    incident_id: str,
+    request: SimulationCreate,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    """Simulate firewall containment action on observed network flows."""
+    incident = (
+        db.query(Incident)
+        .filter(Incident.id == incident_id, Incident.pcap_file_id == pcap_id)
+        .first()
+    )
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    try:
+        simulation = DigitalTwinSimulator.simulate(
+            db=db,
+            incident=incident,
+            description=request.description,
+            actions=request.actions,
+            user_id=user_id
+        )
+        return simulation
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Simulation error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Defense simulation failed")
+
+
+# ============================================================
+# Controlled Response & Firewall Connector
+# ============================================================
+
+@router.post("/{pcap_id}/incidents/{incident_id}/response", response_model=ResponseActionResponse)
+async def request_defense_response(
+    pcap_id: str,
+    incident_id: str,
+    request: ResponseActionCreate,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_analyst)
+):
+    """Submit a request for automated defensive response containment."""
+    incident = (
+        db.query(Incident)
+        .filter(Incident.id == incident_id, Incident.pcap_file_id == pcap_id)
+        .first()
+    )
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    try:
+        response_req = ResponseEngine.create_request(
+            db=db,
+            incident=incident,
+            action=request.action,
+            target=request.target,
+            reason=request.reason,
+            requester_id=user_id
+        )
+        return response_req
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+
+@router.post("/response/{request_id}/approve", response_model=ResponseActionResponse)
+async def approve_defense_response(
+    request_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_admin)
+):
+    """Approve a defensive response action (Admin required)."""
+    response_req = db.query(ResponseRequest).filter(ResponseRequest.id == request_id).first()
+    if not response_req:
+        raise HTTPException(status_code=404, detail="Response request not found")
+
+    try:
+        return ResponseEngine.approve(db, response_req, approved=True, approver_id=user_id)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+
+@router.post("/response/{request_id}/execute", response_model=ResponseActionResponse)
+async def execute_defense_response(
+    request_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_analyst)
+):
+    """Execute an approved response action through the firewall connector."""
+    response_req = db.query(ResponseRequest).filter(ResponseRequest.id == request_id).first()
+    if not response_req:
+        raise HTTPException(status_code=404, detail="Response request not found")
+
+    try:
+        return ResponseEngine.execute(db, response_req, executor_id=user_id)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+
+@router.get("/response/blocklist", response_model=List[BlocklistEntryResponse])
+async def list_blocklist_entries(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    """List all active firewall blocklist entries."""
+    return db.query(BlocklistEntry).filter(BlocklistEntry.is_active.is_(True)).all()
+
