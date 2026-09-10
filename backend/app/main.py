@@ -8,9 +8,12 @@ from contextlib import asynccontextmanager
 import logging
 import sys
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.utils import get_openapi
 
 from app.config import get_settings
@@ -216,14 +219,43 @@ async def general_exception_handler(
 
 
 # ============================================================
-# Root Endpoint
+# Frontend Static Files & SPA Routing
+# ============================================================
+
+frontend_dist_candidates = [
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")),
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "dist")),
+    os.path.abspath(os.path.join(os.getcwd(), "frontend", "dist")),
+    os.path.abspath(os.path.join(os.getcwd(), "dist")),
+    "/app/frontend/dist",
+    "/app/dist"
+]
+
+frontend_dist_dir = None
+for candidate in frontend_dist_candidates:
+    if os.path.exists(candidate) and os.path.exists(os.path.join(candidate, "index.html")):
+        frontend_dist_dir = candidate
+        break
+
+if frontend_dist_dir:
+    logger.info(f" Serving React Frontend UI from {frontend_dist_dir}")
+    assets_dir = os.path.join(frontend_dist_dir, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+
+# ============================================================
+# Root & SPA Routing
 # ============================================================
 
 @app.get(
     "/",
-    tags=["Root"]
+    tags=["Root"],
+    include_in_schema=False
 )
 async def root():
+    if frontend_dist_dir and os.path.exists(os.path.join(frontend_dist_dir, "index.html")):
+        return FileResponse(os.path.join(frontend_dist_dir, "index.html"))
 
     return {
         "message": "Welcome to AegisNet API",
@@ -231,6 +263,20 @@ async def root():
         "openapi": "/openapi.json",
         "health": "/health"
     }
+
+
+if frontend_dist_dir:
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa_app(full_path: str):
+        # Exclude API endpoints from SPA fallback
+        if full_path.startswith(("api/", "auth", "pcaps", "health", "docs", "redoc", "openapi.json")):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+        target_file = os.path.join(frontend_dist_dir, full_path)
+        if full_path and os.path.isfile(target_file):
+            return FileResponse(target_file)
+
+        return FileResponse(os.path.join(frontend_dist_dir, "index.html"))
 
 
 # ============================================================
